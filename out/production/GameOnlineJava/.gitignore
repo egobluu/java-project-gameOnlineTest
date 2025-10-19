@@ -1,0 +1,12 @@
+# Compiled Java class files
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# Log files
+*.log
+log/
+
