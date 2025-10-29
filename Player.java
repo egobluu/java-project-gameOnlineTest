@@ -1,176 +1,238 @@
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Player {
+    public enum State { IDLE, WALKING, ATTACKING }
+    private State currentState = State.IDLE;
+
     private String name;
     private int x, y, hp;
+    private final boolean isLocalPlayer;
+    private enum Direction { LEFT, RIGHT, UP, DOWN }
+    private Direction facing = Direction.RIGHT;
 
-    private BufferedImage[] walkFrames;
+    private Map<String, BufferedImage[]> animations = new HashMap<>();
     private int currentFrame = 0;
-    private int animationCounter = 0;
-    private final int ANIMATION_SPEED = 10;
-    private final int FRAME_COUNT = 8;
+    private int animationTick = 0;
+    private int animationSpeed = 5;
 
-    private int speed = 5;
-    private boolean movingLeft = false;
-    private boolean movingRight = false;
-    private boolean movingUp = false;
-    private boolean movingDown = false;
+    private int speed = 4;
+    private boolean movingLeft, movingRight, movingUp, movingDown;
 
-    private boolean isLocalPlayer = false;
-
-    private enum Direction { LEFT, RIGHT, UP, DOWN, IDLE }
-    private Direction facing = Direction.DOWN;
-
-    private int drawWidth = 64;
-    private int drawHeight = 64;
-
+    private int drawWidth = 96, drawHeight = 96;
     private int targetX, targetY;
     private float smoothX, smoothY;
-    private final float LERP_SPEED = 0.3f;
-
+    private static final float LERP_SPEED = 0.3f;
     private boolean hasSword = false;
-
-    private static final String[] FRAME_FILENAMES = {
-            "boy_down_1.png", "boy_down_2.png",
-            "boy_left_1.png", "boy_left_2.png",
-            "boy_right_1.png", "boy_right_2.png",
-            "boy_up_1.png", "boy_up_2.png"
-    };
-
-    public Player(String name, String spriteBasePath) {
-        this(name, spriteBasePath, false);
-    }
+    private boolean isAlive = true;
+    private boolean isReady = false;
 
     public Player(String name, String spriteBasePath, boolean isLocalPlayer) {
         this.name = name;
-        this.x = 100;
-        this.y = 400;
-        this.hp = 100;
+        this.x = 100; this.y = 400; this.hp = 100;
         this.isLocalPlayer = isLocalPlayer;
-
-        this.targetX = this.x;
-        this.targetY = this.y;
-        this.smoothX = this.x;
-        this.smoothY = this.y;
-
-        loadFrames(spriteBasePath);
+        this.targetX = x; this.targetY = y; this.smoothX = x; this.smoothY = y;
+        loadAnimations(spriteBasePath);
     }
 
-    private void loadFrames(String basePath) {
-        try {
-            walkFrames = new BufferedImage[FRAME_COUNT];
-            for (int i = 0; i < FRAME_COUNT; i++) {
-                String file = basePath + FRAME_FILENAMES[i];
-                var stream = Player.class.getResourceAsStream(file);
-                if (stream != null) {
-                    walkFrames[i] = ImageIO.read(stream);
-                } else {
-                    walkFrames[i] = null;
-                    System.err.println("❌ Cannot find: " + file);
+    private void loadAnimations(String basePath) {
+        String[][] animData = {
+                {"Idle_Right",   "boy_Right",       "1"},
+                {"Idle_Left",    "boy_Left",        "1"},
+                {"Idle_Up",      "boy_up",          "1"},
+                {"Idle_Down",    "boy_down",        "1"},
+                {"Walk_Right",   "boy_Right",       "8"},
+                {"Walk_Left",    "boy_Left",        "8"},
+                {"Walk_Up",      "boy_up",          "2"},
+                {"Walk_Down",    "boy_down",        "2"},
+                {"Attack_Right", "boy_Fight_Right", "6"},
+                {"Attack_Left",  "boy_Fight_Left",  "6"}
+        };
+
+        for (String[] data : animData) {
+            String animName = data[0];
+            String folder = data[1];
+            int frameCount = Integer.parseInt(data[2]);
+            BufferedImage[] frames = new BufferedImage[frameCount];
+
+            for (int i = 0; i < frameCount; i++) {
+                String path = basePath + folder + "/" + folder + "_" + i + ".png";
+                try {
+                    var stream = getClass().getResourceAsStream(path);
+                    if (stream != null) {
+                        frames[i] = ImageIO.read(stream);
+                    } else {
+                        System.err.println("❌ Missing sprite: " + path);
+                    }
+                } catch (Exception e) {
+                    System.err.println("❌ Error loading sprite: " + path);
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            animations.put(animName, frames);
         }
     }
 
-    public void syncFromServer(int x, int y, int hp, boolean hasSword) {
-        this.hp = hp;
-        this.hasSword = hasSword;
-        if (!isLocalPlayer) {
-            this.targetX = x;
-            this.targetY = y;
-        }
-    }
-
-    public void updateMovement(int screenWidth, int screenHeight) {
-        if (!isLocalPlayer || isDead()) return;
-        if (movingLeft) { x -= speed; facing = Direction.LEFT; }
-        if (movingRight) { x += speed; facing = Direction.RIGHT; }
-        if (movingUp) { y -= speed; facing = Direction.UP; }
-        if (movingDown) { y += speed; facing = Direction.DOWN; }
-        smoothX = x; smoothY = y;
-    }
-
-    public void clampToGround(int groundTopY, int groundBottomY, int screenWidth) {
-        if (x < 0) x = 0;
-        if (x + drawWidth > screenWidth) x = screenWidth - drawWidth;
-        if (y < groundTopY) y = groundTopY;
-        if (y + drawHeight > groundBottomY) y = groundBottomY - drawHeight;
-    }
-
-    public void updateAnimation() {
+    public void update() {
         if (!isLocalPlayer) {
             smoothX += (targetX - smoothX) * LERP_SPEED;
             smoothY += (targetY - smoothY) * LERP_SPEED;
             this.x = Math.round(smoothX);
             this.y = Math.round(smoothY);
         }
-        if (isMoving()) {
-            animationCounter++;
-            if (animationCounter >= ANIMATION_SPEED) {
-                animationCounter = 0;
-                currentFrame = (currentFrame + 1) % 2;
+
+        if (isLocalPlayer) {
+            if (currentState == State.ATTACKING) {
+            } else if (movingLeft || movingRight || movingUp || movingDown) {
+                currentState = State.WALKING;
+            } else {
+                currentState = State.IDLE;
             }
-        } else {
-            animationCounter = 0;
-            currentFrame = 0;
         }
-    }
 
-    public boolean isMoving() { return movingLeft || movingRight || movingUp || movingDown; }
-    public boolean isDead() { return hp <= 0; }
+        animationTick++;
+        if (animationTick > animationSpeed) {
+            animationTick = 0;
+            currentFrame++;
 
-    public void setMovingLeft(boolean moving) { movingLeft = moving; if (moving) facing = Direction.LEFT; }
-    public void setMovingRight(boolean moving) { movingRight = moving; if (moving) facing = Direction.RIGHT; }
-    public void setMovingUp(boolean moving) { movingUp = moving; if (moving) facing = Direction.UP; }
-    public void setMovingDown(boolean moving) { movingDown = moving; if (moving) facing = Direction.DOWN; }
+            BufferedImage[] currentAnimation = animations.get(getCurrentAnimationKey());
+            if (currentAnimation == null) return;
 
-    public String getMovementData() {
-        StringBuilder sb = new StringBuilder();
-        if (movingLeft) sb.append("L");
-        if (movingRight) sb.append("R");
-        if (movingUp) sb.append("U");
-        if (movingDown) sb.append("D");
-        return sb.toString();
+            if (currentFrame >= currentAnimation.length) {
+                if (currentState == State.ATTACKING) {
+                    currentState = State.IDLE;
+                }
+                currentFrame = 0;
+            }
+        }
     }
 
     public void draw(Graphics g) {
-        if (isDead()) return; // ✅ ไม่วาดถ้าตาย
-        BufferedImage frame = null;
-        int walkFrameIndex = currentFrame;
-        switch (facing) {
-            case LEFT -> frame = (isMoving() ? walkFrames[2 + walkFrameIndex] : walkFrames[2]);
-            case RIGHT -> frame = (isMoving() ? walkFrames[4 + walkFrameIndex] : walkFrames[4]);
-            case DOWN -> frame = (isMoving() ? walkFrames[0 + walkFrameIndex] : walkFrames[0]);
-            case UP -> frame = (isMoving() ? walkFrames[6 + walkFrameIndex] : walkFrames[6]);
-            case IDLE -> frame = walkFrames[0];
+        if (!isAlive) return;
+        Graphics2D g2d = (Graphics2D) g.create();
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+
+        BufferedImage[] currentAnimation = animations.get(getCurrentAnimationKey());
+        if (currentAnimation != null && currentFrame < currentAnimation.length && currentAnimation[currentFrame] != null) {
+            g2d.drawImage(currentAnimation[currentFrame], x, y, drawWidth, drawHeight, null);
+        } else {
+            g.setColor(isLocalPlayer ? Color.GREEN : Color.RED);
+            g.fillRect(x, y, 64, 64);
         }
-        if (frame != null) g.drawImage(frame, x, y, drawWidth, drawHeight, null);
 
-        // วาด HP
+        g2d.dispose();
+        drawUI(g);
+    }
+
+    private String getCurrentAnimationKey() {
+        String key;
+        switch (currentState) {
+            case WALKING:   key = "Walk_";   break;
+            case ATTACKING: key = "Attack_"; break;
+            default:        key = "Idle_";   break;
+        }
+
+        String directionKey = facing.toString().substring(0, 1) + facing.toString().substring(1).toLowerCase();
+        key += directionKey;
+
+        if (!animations.containsKey(key)) {
+            String fallbackKey = "Idle_" + directionKey;
+            return fallbackKey;
+        }
+        return key;
+    }
+
+    public void attack() {
+        if (currentState != State.ATTACKING) {
+            this.currentState = State.ATTACKING;
+            this.currentFrame = 0;
+            this.animationTick = 0;
+        }
+    }
+
+    // ===== MODIFIED ===== แก้ไขให้รับค่า State และ Direction จาก Server
+    public void syncFromServer(int x, int y, int hp, boolean hasSword, boolean isAlive, boolean isReady, String stateStr, String facingStr) {
+        this.hp = hp;
+        this.hasSword = hasSword;
+        this.isAlive = isAlive;
+        this.isReady = isReady;
+
+        if (!isLocalPlayer) {
+            this.targetX = x;
+            this.targetY = y;
+
+            try {
+                this.facing = Direction.valueOf(facingStr.toUpperCase());
+
+                State receivedState = State.valueOf(stateStr.toUpperCase());
+                if (this.currentState != State.ATTACKING || receivedState != State.WALKING) {
+                    this.setState(receivedState);
+                }
+            } catch (IllegalArgumentException e) {
+                this.facing = Direction.RIGHT;
+                this.setState(State.IDLE);
+            }
+        }
+    }
+
+    public void setState(State newState) {
+        if (this.currentState != newState) {
+            this.currentState = newState;
+            this.currentFrame = 0;
+            this.animationTick = 0;
+        }
+    }
+
+    public boolean isMoving() {
+        return movingLeft || movingRight || movingUp || movingDown;
+    }
+
+    public void updateMovement(int screenWidth, int screenHeight) {
+        if (!isLocalPlayer || !isAlive) return;
+        if (movingLeft)  { x -= speed; }
+        if (movingRight) { x += speed; }
+        if (movingUp)    { y -= speed; }
+        if (movingDown)  { y += speed; }
+    }
+
+    public void clampToGround(int groundTopY, int groundBottomY, int screenWidth) {
+        if (x < 0) x = 0;
+        if (x + drawWidth > screenWidth) x = screenWidth - drawWidth;
+        if (y < groundTopY - 32) y = groundTopY - 32;
+        if (y + drawHeight > groundBottomY + 32) y = groundBottomY + 32 - drawHeight;
+    }
+
+    public void drawUI(Graphics g) {
         g.setColor(Color.BLACK);
-        g.fillRect(x - 2, y - 12, 104, 9);
+        g.fillRect(x + 16, y - 12, 64, 9);
         g.setColor(Color.DARK_GRAY);
-        g.fillRect(x, y - 10, 100, 5);
+        g.fillRect(x + 18, y - 10, 60, 5);
         g.setColor(hp > 30 ? Color.GREEN : (hp > 15 ? Color.YELLOW : Color.RED));
-        g.fillRect(x, y - 10, hp, 5);
+        int hpBarWidth = (int) (60 * (hp / 100.0));
+        g.fillRect(x + 18, y - 10, Math.max(0, hpBarWidth), 5);
 
-        // ชื่อ
         g.setColor(Color.WHITE);
         g.setFont(new Font("Arial", Font.BOLD, 12));
         FontMetrics fm = g.getFontMetrics();
-        int nameWidth = fm.stringWidth(name);
-        g.drawString(name, x + (drawWidth - nameWidth) / 2, y - 15);
+        int w = fm.stringWidth(name);
+        g.drawString(name, x + (drawWidth - w)/2, y - 15);
     }
 
-    public void pickupSword() { hasSword = true; }
-    public boolean hasSword() { return hasSword; }
+    // ===== NEW ===== เมธอดใหม่สำหรับดึงข้อมูลไปส่งให้ Server
+    public String getFacingDirection() {
+        return this.facing.toString();
+    }
 
+    public boolean isAlive() { return isAlive; }
+    public boolean isReady() { return isReady; }
+    public void setMovingLeft(boolean v)  { this.movingLeft = v; if(v) this.facing = Direction.LEFT; }
+    public void setMovingRight(boolean v) { this.movingRight = v; if(v) this.facing = Direction.RIGHT; }
+    public void setMovingUp(boolean v)    { this.movingUp = v; if(v) this.facing = Direction.UP; }
+    public void setMovingDown(boolean v)  { this.movingDown = v; if(v) this.facing = Direction.DOWN; }
+    public boolean hasSword() { return hasSword; }
     public int getX() { return x; }
     public int getY() { return y; }
-    public int getHp() { return hp; }
     public String getName() { return name; }
 }
