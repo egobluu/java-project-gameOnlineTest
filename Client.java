@@ -14,7 +14,6 @@ public class Client extends JFrame {
     private CharacterSelectionPanel characterSelectionPanel;
     private Thread receiverThread;
     private String playerName;
-    private String characterId;
     private Map<String, String> characterMap;
 
     public Client() {
@@ -41,7 +40,6 @@ public class Client extends JFrame {
     }
 
     public void attemptLogin(String name, String characterId) {
-        this.characterId = characterId;
         new Thread(() -> {
             try {
                 socket = new Socket("localhost", 12345);
@@ -91,7 +89,7 @@ public class Client extends JFrame {
                 String msg;
                 while ((msg = in.readLine()) != null) {
                     final String m = msg;
-                    if (gamePanel != null) {
+                    if(gamePanel != null) {
                         SwingUtilities.invokeLater(() -> gamePanel.processServerMessage(m));
                     }
                 }
