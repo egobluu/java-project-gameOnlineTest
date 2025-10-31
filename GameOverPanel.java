@@ -77,46 +77,47 @@ public class GameOverPanel extends JPanel {
                 int podiumWidth = 140;
                 int podiumSpacing = 80;
 
-                // เส้นพื้น
                 g2.setColor(new Color(255, 255, 255, 40));
                 g2.fillRect(0, baseY + 1, w, 4);
 
                 g2.setFont(new Font("Arial", Font.BOLD, 28));
 
-                // 🥈 2nd
-                if (rankings.size() >= 2) {
-                    String player2 = rankings.get(1);
-                    int xLeft = w / 2 - podiumWidth - podiumSpacing / 2;
-                    g2.setColor(new Color(192, 192, 192));
-                    g2.fillRoundRect(xLeft, baseY - 120, podiumWidth, 120, 16, 16);
-                    drawCharacter(g2, player2, xLeft + podiumWidth / 2 - 50, baseY - 120 - 110);
+                // 🥇🥈🥉 แสดง podium สูงสุด 3 คนเท่านั้น
+                int podiumCount = Math.min(rankings.size(), 3);
+
+                for (int i = 0; i < podiumCount; i++) {
+                    String player = rankings.get(i);
+
+                    int x, height;
+                    Color color;
+
+                    switch (i) {
+                        case 0 -> { // 🥇 Center
+                            x = w / 2 - podiumWidth / 2;
+                            height = 180;
+                            color = new Color(255, 215, 0);
+                        }
+                        case 1 -> { // 🥈 Left
+                            x = w / 2 - podiumWidth - podiumSpacing / 2;
+                            height = 120;
+                            color = new Color(192, 192, 192);
+                        }
+                        case 2 -> { // 🥉 Right
+                            x = w / 2 + podiumSpacing / 2;
+                            height = 90;
+                            color = new Color(205, 127, 50);
+                        }
+                        default -> throw new IllegalStateException("Unexpected rank: " + i);
+                    }
+
+                    g2.setColor(color);
+                    g2.fillRoundRect(x, baseY - height, podiumWidth, height, 16, 16);
+                    drawCharacter(g2, player, x + podiumWidth / 2 - 50, baseY - height - 110);
                     g2.setColor(Color.WHITE);
-                    drawCenteredString(g2, "" + player2, xLeft + podiumWidth / 2, baseY - 130);
+                    drawCenteredString(g2, player, x + podiumWidth / 2, baseY - height - 100);
                 }
 
-                // 🥇 1st
-                if (rankings.size() >= 1) {
-                    String player1 = rankings.get(0);
-                    int xCenter = w / 2 - podiumWidth / 2;
-                    g2.setColor(new Color(255, 215, 0));
-                    g2.fillRoundRect(xCenter, baseY - 180, podiumWidth, 180, 16, 16);
-                    drawCharacter(g2, player1, xCenter + podiumWidth / 2 - 50, baseY - 180 - 120);
-                    g2.setColor(Color.WHITE);
-                    drawCenteredString(g2, "" + player1, xCenter + podiumWidth / 2, baseY - 190);
-                }
-
-                // 🥉 3rd
-                if (rankings.size() >= 3) {
-                    String player3 = rankings.get(2);
-                    int xRight = w / 2 + podiumSpacing / 2;
-                    g2.setColor(new Color(205, 127, 50));
-                    g2.fillRoundRect(xRight, baseY - 90, podiumWidth, 90, 16, 16);
-                    drawCharacter(g2, player3, xRight + podiumWidth / 2 - 50, baseY - 90 - 110);
-                    g2.setColor(Color.WHITE);
-                    drawCenteredString(g2, "" + player3, xRight + podiumWidth / 2, baseY - 100);
-                }
-
-                // กรณีมีอันดับน้อยกว่า 3 ให้ช่วยบอกผู้ใช้
+                // ถ้าไม่มีข้อมูล
                 if (rankings.isEmpty()) {
                     g2.setColor(Color.LIGHT_GRAY);
                     g2.setFont(new Font("Arial", Font.PLAIN, 22));

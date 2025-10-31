@@ -13,6 +13,7 @@ class PlayerState {
     boolean isReady;
     String actionState = "IDLE";
     String facingDirection = "RIGHT";
+    static final List<String> deathOrder = new CopyOnWriteArrayList<>();
 
     PlayerState(int x, int y, int hp, boolean hasSword, boolean isAlive, String characterId) {
         this.x = x; this.y = y; this.hp = hp;
@@ -85,11 +86,13 @@ public class Server {
                 this.playerName = parts[1];
                 this.characterId = parts[2];
 
-                if (isCharacterTaken(characterId)) {
-                    System.out.println("REJECT: " + playerName + " tried to pick " + characterId + " (taken).");
-                    out.println("ERROR:TAKEN");
+                if (gameStarted) {
+                    out.println("ERROR:GAME_ALREADY_STARTED");
+                    System.out.println("REJECT: " + playerName + " tried to join after game started.");
+                    socket.close();
                     return;
                 }
+
 
                 out.println("SUCCESS");
                 clientWriters.add(out);
@@ -183,6 +186,9 @@ public class Server {
                             otherPlayer.hp = 0;
                             otherPlayer.isAlive = false;
                             graves.add(new Point(otherPlayer.x, otherPlayer.y));
+                            if (!PlayerState.deathOrder.contains(otherName)) {
+                                PlayerState.deathOrder.add(otherName);
+                            }
                         }
                         break;
                     }
@@ -214,25 +220,30 @@ public class Server {
 
     private static synchronized void checkGameStart() {
         if (gameStarted || players.size() < REQUIRED_PLAYERS) return;
+
         boolean allReady = players.values().stream().allMatch(p -> p.isReady);
 
         if (allReady) {
             gameStarted = true;
             graves.clear();
+            swords.clear();
+            Random r = new Random();
+
             for (PlayerState p : players.values()) {
                 p.hp = 100;
                 p.isAlive = true;
                 p.hasSword = false;
             }
-            swords.clear();
-            Random r = new Random();
+
             int swordsToSpawn = Math.max(1, players.size() - 1);
             for (int i = 0; i < swordsToSpawn; i++) {
                 int sx = 100 + r.nextInt(600);
                 int sy = 250 + r.nextInt(200);
                 swords.add(new SwordState(sx, sy));
             }
+
             broadcast("START_GAME");
+            System.out.println("🚀 GAME STARTED with " + players.size() + " players");
         }
     }
 
@@ -271,46 +282,49 @@ public class Server {
     private static void checkWinner() {
         if (!gameStarted) return;
 
-        // หาผู้เล่นที่ยังมีชีวิต
         List<String> alivePlayers = players.entrySet().stream()
                 .filter(e -> e.getValue().isAlive)
                 .map(Map.Entry::getKey)
                 .toList();
 
-        // เกมจบถ้ามีผู้รอด <= 1
-        if (alivePlayers.size() <= 1 && players.size() >= REQUIRED_PLAYERS) {
+        // เมื่อเหลือรอด <= 1 ให้เกมจบ
+        if (alivePlayers.size() <= 1 && players.size() >= 2) {
             String winnerName = alivePlayers.isEmpty() ? "NO ONE" : alivePlayers.get(0);
 
-            // ✅ จัดอันดับใหม่
             List<String> rankingList = new ArrayList<>();
+
+            // 🥇 คนสุดท้ายรอดชีวิต
             if (!winnerName.equals("NO ONE")) {
-                rankingList.add(winnerName); // ใส่ผู้ชนะเป็นที่ 1
+                rankingList.add(winnerName);
             }
 
-            // ผู้ที่ตาย -> ตามลำดับเวลาที่ตาย (ใช้ลิสต์ graves)
-            for (Point g : graves) {
-                // หาชื่อคนที่ตาย ณ จุดนี้
-                players.entrySet().stream()
-                        .filter(e -> !e.getValue().isAlive)
-                        .filter(e -> !rankingList.contains(e.getKey()))
-                        .map(Map.Entry::getKey)
-                        .findFirst()
-                        .ifPresent(rankingList::add);
+            // 🥈–🥉 คนที่ตายก่อนหน้า (เรียงย้อนจาก deathOrder)
+            for (int i = PlayerState.deathOrder.size() - 1; i >= 0; i--) {
+                String name = PlayerState.deathOrder.get(i);
+                if (!rankingList.contains(name)) {
+                    rankingList.add(name);
+                }
             }
 
-            // ถ้ายังมีคนตายแต่ไม่ถูกใส่ -> เติมเข้ามา (กันพลาด)
-            players.entrySet().stream()
-                    .filter(e -> !e.getValue().isAlive)
-                    .map(Map.Entry::getKey)
-                    .filter(name -> !rankingList.contains(name))
-                    .forEach(rankingList::add);
+            // กันพลาด: ใส่ชื่อที่อาจตกหล่น
+            for (String n : players.keySet()) {
+                if (!rankingList.contains(n)) {
+                    rankingList.add(n);
+                }
+            }
 
-            // ✅ ส่ง Winner + Rankings ครบ
+            // ส่งให้ทุก client
             String msg = "WINNER:" + winnerName + ":" + String.join(",", rankingList);
             broadcast(msg);
 
+            System.out.println("🏆 GAME OVER — WINNER: " + winnerName);
+            System.out.println("Ranking: " + rankingList);
+
+            // reset สำหรับรอบต่อไป
             gameStarted = false;
+            PlayerState.deathOrder.clear();
         }
     }
+
 
 }

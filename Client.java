@@ -15,6 +15,7 @@ public class Client extends JFrame {
     private Thread receiverThread;
     private String playerName;
     private Map<String, String> characterMap;
+    private String serverIp = "localhost";
 
     public Client() {
         setTitle("PvP Fighting Game");
@@ -30,6 +31,13 @@ public class Client extends JFrame {
         setVisible(true);
     }
 
+     // ค่า default
+
+    // setter
+    public void setServerIp(String ip) {
+        this.serverIp = ip;
+    }
+
     public void showCharacterSelection(String name) {
         this.playerName = name;
         getContentPane().removeAll();
@@ -42,7 +50,7 @@ public class Client extends JFrame {
     public void attemptLogin(String name, String characterId) {
         new Thread(() -> {
             try {
-                socket = new Socket("localhost", 12345);
+                socket = new Socket(serverIp, 12345);
                 out = new PrintWriter(socket.getOutputStream(), true);
                 in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
