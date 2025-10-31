@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class GamePanel extends JPanel implements KeyListener {
     private Image background;
@@ -11,7 +12,7 @@ public class GamePanel extends JPanel implements KeyListener {
     private Client client;
     private Player localPlayer;
     private final Map<String, Player> allPlayers = new LinkedHashMap<>();
-    private final List<Sword> swords = new ArrayList<>();
+    private final List<Sword> swords = new CopyOnWriteArrayList<>();
     private Timer gameTimer;
     private Timer networkTimer;
     private int lastSentX = -1, lastSentY = -1;

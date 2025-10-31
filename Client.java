@@ -1,43 +1,43 @@
 import java.io.*;
 import java.net.*;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import javax.swing.*;
-import java.awt.BorderLayout;
+import java.awt.*;
+import java.util.List;
 
 public class Client extends JFrame {
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+
     private GamePanel gamePanel;
     private MainMenuPanel mainMenuPanel;
     private CharacterSelectionPanel characterSelectionPanel;
+
     private Thread receiverThread;
+
     private String playerName;
-    private Map<String, String> characterMap;
-    private String serverIp = "localhost";
+    private String characterId;
+    private String serverIp = "localhost";  // ✅ จำค่า IP ล่าสุด
+    private boolean connected = false;
 
     public Client() {
         setTitle("PvP Fighting Game");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
+        setLayout(new BorderLayout());
 
         mainMenuPanel = new MainMenuPanel(this);
-        setLayout(new BorderLayout());
         add(mainMenuPanel, BorderLayout.CENTER);
 
         setLocationRelativeTo(null);
         setVisible(true);
     }
 
-     // ค่า default
-
-    // setter
-    public void setServerIp(String ip) {
-        this.serverIp = ip;
-    }
-
+    // ============================================================
+    // ✅ ส่วนควบคุมหน้าจอ
+    // ============================================================
     public void showCharacterSelection(String name) {
         this.playerName = name;
         getContentPane().removeAll();
@@ -47,98 +47,135 @@ public class Client extends JFrame {
         repaint();
     }
 
-    public void attemptLogin(String name, String characterId) {
-        new Thread(() -> {
-            try {
-                socket = new Socket(serverIp, 12345);
-                out = new PrintWriter(socket.getOutputStream(), true);
-                in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                out.println("SELECT:" + name + ":" + characterId);
-
-                String response = in.readLine();
-
-                if ("SUCCESS".equals(response)) {
-                    SwingUtilities.invokeLater(() -> {
-                        getContentPane().removeAll();
-                        gamePanel = new GamePanel();
-                        gamePanel.setClient(this);
-
-                        String spritePath = "/assets/" + characterId + "/";
-                        gamePanel.setLocalPlayer(name, spritePath);
-
-                        add(gamePanel, BorderLayout.CENTER);
-                        revalidate();
-                        repaint();
-                        setTitle("PvP Client - " + name);
-                        startReceiverThread();
-                    });
-                } else {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(this,
-                                "This character is already taken!\nPlease choose another one.",
-                                "Selection Error", JOptionPane.ERROR_MESSAGE);
-                    });
-                    socket.close();
-                }
-            } catch (IOException e) {
-                SwingUtilities.invokeLater(() -> {
-                    JOptionPane.showMessageDialog(this,
-                            "Cannot connect to server!\nPlease make sure the server is running.",
-                            "Connection Error", JOptionPane.ERROR_MESSAGE);
-                });
-            }
-        }).start();
-    }
-
-    private void startReceiverThread() {
-        receiverThread = new Thread(() -> {
-            try {
-                String msg;
-                while ((msg = in.readLine()) != null) {
-                    final String m = msg;
-                    System.out.println("📩 Received from server: " + m);
-                    if(gamePanel != null) {
-                        SwingUtilities.invokeLater(() -> gamePanel.processServerMessage(m));
-                    }
-                }
-            } catch (IOException e) {
-                System.out.println("Receiver stopped: " + e.getMessage());
-            }
-        }, "ReceiverThread");
-        receiverThread.start();
-    }
-
-    public void sendMessage(String message) {
-        if (out != null && !socket.isClosed()) out.println(message);
+    public void showGamePanel(String name, String characterId) {
+        getContentPane().removeAll();
+        gamePanel = new GamePanel();
+        gamePanel.setClient(this);
+        gamePanel.setLocalPlayer(name, "/assets/" + characterId + "/");
+        add(gamePanel, BorderLayout.CENTER);
+        revalidate();
+        repaint();
     }
 
     public void showGameOverScreen(List<String> rankings, Map<String, String> characterMap) {
-        this.characterMap = characterMap;
         getContentPane().removeAll();
-        setLayout(new BorderLayout());
         GameOverPanel gameOverPanel = new GameOverPanel(rankings, this, characterMap);
         add(gameOverPanel, BorderLayout.CENTER);
         revalidate();
         repaint();
     }
 
+    // ✅ กลับไปเลือกตัวละครทันที (ไม่ต้องกรอก IP ใหม่)
     public void backToMainMenu() {
-        try {
-            if (socket != null && !socket.isClosed()) socket.close();
-            if (receiverThread != null && receiverThread.isAlive()) {
-                receiverThread.interrupt();
-                receiverThread.join(500);
-            }
-        } catch (Exception ignored) {}
+        if (connected && socket != null && !socket.isClosed()) {
+            try {
+                socket.close();
+            } catch (IOException ignored) {}
+        }
 
         getContentPane().removeAll();
-        setLayout(new BorderLayout());
-        mainMenuPanel = new MainMenuPanel(this);
-        add(mainMenuPanel, BorderLayout.CENTER);
-        setTitle("PvP Fighting Game");
+        characterSelectionPanel = new CharacterSelectionPanel(this, playerName != null ? playerName : "Player");
+        add(characterSelectionPanel, BorderLayout.CENTER);
         revalidate();
         repaint();
+    }
+
+    // ============================================================
+    // ✅ การเชื่อมต่อเซิร์ฟเวอร์
+    // ============================================================
+    public void attemptLogin(String name, String characterId) {
+        this.playerName = name;
+        this.characterId = characterId;
+
+        new Thread(() -> {
+            try {
+                System.out.println("🔌 Connecting to server at " + serverIp + "...");
+                socket = new Socket(serverIp, 12345);
+                out = new PrintWriter(socket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                connected = true;
+
+                // ส่งข้อมูลตัวละคร
+                out.println("SELECT:" + playerName + ":" + characterId);
+                // ===== หลังส่ง SELECT ไป server =====
+                String response = in.readLine();
+
+                if (response.startsWith("ASSIGNED_NAME:")) {
+                    playerName = response.substring("ASSIGNED_NAME:".length());
+                    System.out.println("✅ Assigned name: " + playerName);
+
+                    // เริ่มรับข้อความอื่น ๆ จาก server ต่อ
+                    receiverThread = new Thread(this::receiveMessages);
+                    receiverThread.start();
+
+                    SwingUtilities.invokeLater(() -> showGamePanel(playerName, characterId));
+
+                } else if ("ERROR:GAME_ALREADY_STARTED".equals(response)) {
+                    JOptionPane.showMessageDialog(this,
+                            "Cannot join. The game has already started!",
+                            "Game in Progress", JOptionPane.WARNING_MESSAGE);
+                    socket.close();
+                    return;
+
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Failed to join server. Please try again.",
+                            "Connection Failed", JOptionPane.ERROR_MESSAGE);
+                    socket.close();
+                    return;
+                }
+
+                System.out.println("✅ Joined server successfully as " + playerName + " (" + characterId + ")");
+                SwingUtilities.invokeLater(() -> showGamePanel(playerName, characterId));
+
+                receiverThread = new Thread(this::receiveMessages);
+                receiverThread.start();
+
+            } catch (IOException e) {
+                System.err.println("❌ Failed to connect: " + e.getMessage());
+                JOptionPane.showMessageDialog(this,
+                        "Unable to connect to server: " + e.getMessage(),
+                        "Connection Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }).start();
+    }
+
+    private void receiveMessages() {
+        try {
+            String line;
+            while ((line = in.readLine()) != null) {
+                if (gamePanel != null) {
+                    gamePanel.processServerMessage(line);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("📴 Disconnected from server: " + e.getMessage());
+        } finally {
+            try {
+                if (socket != null) socket.close();
+            } catch (IOException ignored) {}
+        }
+    }
+
+    public void sendMessage(String msg) {
+        if (out != null && connected) {
+            out.println(msg);
+        }
+    }
+
+    // ============================================================
+    // ✅ getter / setter ต่าง ๆ
+    // ============================================================
+    public void setServerIp(String ip) {
+        this.serverIp = ip;
+    }
+
+    public String getServerIp() {
+        return serverIp;
+    }
+
+    public boolean isConnected() {
+        return connected;
     }
 
     public static void main(String[] args) {

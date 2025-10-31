@@ -18,12 +18,6 @@ public class MainMenuPanel extends JPanel {
             setBackground(Color.GRAY);
         }
 
-        // ช่องกรอก IP
-        JLabel ipLabel = new JLabel("Server IP:");
-        ipLabel.setBounds(280, 170, 100, 30);
-        ipLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        ipLabel.setForeground(Color.WHITE);
-
         JButton join = styled("JOIN");
         join.setBounds(325, 220, 150, 40);
         JButton set  = styled("Setting");
@@ -61,20 +55,18 @@ public class MainMenuPanel extends JPanel {
     }
 
     private void onJoin() {
-        String name = JOptionPane.showInputDialog(this, "Enter your fighter name:");
-        if (name != null && !name.trim().isEmpty()) {
-
-            String serverIp = JOptionPane.showInputDialog(this,
-                    "Enter Server IP (default: localhost):", "localhost");
-            if (serverIp == null || serverIp.isEmpty()) {
-                serverIp = "localhost";
-            }
-
-            client.setServerIp(serverIp);
-            client.showCharacterSelection(name.trim());
+        // ตัด dialog กรอกชื่อออก เหลือแค่กรอก IP
+        String serverIp = JOptionPane.showInputDialog(this,
+                "Enter Server IP (default: localhost):", "localhost");
+        if (serverIp == null || serverIp.isEmpty()) {
+            serverIp = "localhost";
         }
-    }
 
+        client.setServerIp(serverIp);
+        // ใช้ชื่อดีฟอลต์ (หรือจะดึงมาจาก client ก็ได้)
+        String defaultName = "Player";
+        client.showCharacterSelection(defaultName);
+    }
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);

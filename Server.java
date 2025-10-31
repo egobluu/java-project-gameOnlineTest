@@ -85,8 +85,10 @@ public class Server {
                 if (selectionMessage == null || !selectionMessage.startsWith("SELECT:")) { return; }
 
                 String[] parts = selectionMessage.split(":");
-                this.playerName = parts[1];
                 this.characterId = parts[2];
+
+                this.playerName = assignPlayerName();
+                out.println("ASSIGNED_NAME:" + playerName);
 
                 if (gameStarted) {
                     out.println("ERROR:GAME_ALREADY_STARTED");
@@ -236,6 +238,11 @@ public class Server {
                 p.actionState = "IDLE";
             }
         }
+    }
+
+    private static synchronized String assignPlayerName() {
+        int playerNumber = players.size() + 1;
+        return "Player " + playerNumber;
     }
 
     private static synchronized void checkGameStart() {
