@@ -97,6 +97,7 @@ public class Client extends JFrame {
                 String msg;
                 while ((msg = in.readLine()) != null) {
                     final String m = msg;
+                    System.out.println("📩 Received from server: " + m);
                     if(gamePanel != null) {
                         SwingUtilities.invokeLater(() -> gamePanel.processServerMessage(m));
                     }

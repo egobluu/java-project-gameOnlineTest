@@ -167,6 +167,7 @@ public class GamePanel extends JPanel implements KeyListener {
                     );
                 }
                 allPlayers.keySet().retainAll(activePlayerNames);
+                repaint();
 
                 swords.clear();
                 if (stateParts.length > 1 && stateParts[1].startsWith("SWORDS")) {

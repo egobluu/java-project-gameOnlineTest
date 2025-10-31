@@ -45,7 +45,9 @@ public class Server {
                     }
                     broadcastFullState();
                 }
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+                ignored.printStackTrace(); // ✅ ดู error จริง
+            }
         }, "StateBroadcaster").start();
 
         // Game Logic Loop
@@ -276,6 +278,9 @@ public class Server {
     private static void broadcast(String msg) {
         for (PrintWriter w : clientWriters) {
             w.println(msg);
+        }
+        if (msg.startsWith("STATE")) {
+            System.out.println("🛰 Broadcast STATE to " + clientWriters.size() + " clients");
         }
     }
 
