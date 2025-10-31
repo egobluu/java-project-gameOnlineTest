@@ -9,16 +9,15 @@ public class Client extends JFrame {
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+    private Thread receiverThread;
 
     private GamePanel gamePanel;
     private MainMenuPanel mainMenuPanel;
     private CharacterSelectionPanel characterSelectionPanel;
 
-    private Thread receiverThread;
-
     private String playerName;
     private String characterId;
-    private String serverIp = "localhost";  // ✅ จำค่า IP ล่าสุด
+    private String serverIp = "localhost";
     private boolean connected = false;
 
     public Client() {
@@ -30,14 +29,11 @@ public class Client extends JFrame {
 
         mainMenuPanel = new MainMenuPanel(this);
         add(mainMenuPanel, BorderLayout.CENTER);
-
         setLocationRelativeTo(null);
         setVisible(true);
     }
 
-    // ============================================================
-    // ✅ ส่วนควบคุมหน้าจอ
-    // ============================================================
+    // === UI Navigation ===
     public void showCharacterSelection(String name) {
         this.playerName = name;
         getContentPane().removeAll();
@@ -65,31 +61,29 @@ public class Client extends JFrame {
         repaint();
     }
 
-    // ✅ กลับไปเลือกตัวละครทันที (ไม่ต้องกรอก IP ใหม่)
     public void backToMainMenu() {
-        if (connected && socket != null && !socket.isClosed()) {
-            try {
-                socket.close();
-            } catch (IOException ignored) {}
-        }
-
         getContentPane().removeAll();
-        characterSelectionPanel = new CharacterSelectionPanel(this, playerName != null ? playerName : "Player");
-        add(characterSelectionPanel, BorderLayout.CENTER);
+        mainMenuPanel = new MainMenuPanel(this);
+        add(mainMenuPanel, BorderLayout.CENTER);
         revalidate();
         repaint();
     }
 
-    // ============================================================
-    // ✅ การเชื่อมต่อเซิร์ฟเวอร์
-    // ============================================================
+    // === Connection Handling ===
     public void attemptLogin(String name, String characterId) {
         this.playerName = name;
         this.characterId = characterId;
 
         new Thread(() -> {
             try {
-                System.out.println("🔌 Connecting to server at " + serverIp + "...");
+                // ✅ ปิด socket เก่าก่อน (ถ้ายังเชื่อมต่ออยู่)
+                if (connected && socket != null && !socket.isClosed()) {
+                    try { socket.close(); } catch (IOException ignored) {}
+                    connected = false;
+                    System.out.println("♻️ Reconnecting to server...");
+                }
+
+                // ✅ เปิดการเชื่อมต่อใหม่เสมอ
                 socket = new Socket(serverIp, 12345);
                 out = new PrintWriter(socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -97,14 +91,24 @@ public class Client extends JFrame {
 
                 // ส่งข้อมูลตัวละคร
                 out.println("SELECT:" + playerName + ":" + characterId);
-                // ===== หลังส่ง SELECT ไป server =====
+
+                // รอ response
                 String response = in.readLine();
+
+                if (response == null) {
+                    JOptionPane.showMessageDialog(this, "Server did not respond.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
 
                 if (response.startsWith("ASSIGNED_NAME:")) {
                     playerName = response.substring("ASSIGNED_NAME:".length());
-                    System.out.println("✅ Assigned name: " + playerName);
+                    System.out.println("✅ Joined as " + playerName);
 
-                    // เริ่มรับข้อความอื่น ๆ จาก server ต่อ
+                    if (receiverThread != null && receiverThread.isAlive()) {
+                        receiverThread.interrupt();
+                    }
+
+                    // ✅ เริ่ม thread รับข้อความ
                     receiverThread = new Thread(this::receiveMessages);
                     receiverThread.start();
 
@@ -114,22 +118,11 @@ public class Client extends JFrame {
                     JOptionPane.showMessageDialog(this,
                             "Cannot join. The game has already started!",
                             "Game in Progress", JOptionPane.WARNING_MESSAGE);
-                    socket.close();
-                    return;
-
                 } else {
                     JOptionPane.showMessageDialog(this,
-                            "Failed to join server. Please try again.",
-                            "Connection Failed", JOptionPane.ERROR_MESSAGE);
-                    socket.close();
-                    return;
+                            "Unexpected server response: " + response,
+                            "Connection Error", JOptionPane.ERROR_MESSAGE);
                 }
-
-                System.out.println("✅ Joined server successfully as " + playerName + " (" + characterId + ")");
-                SwingUtilities.invokeLater(() -> showGamePanel(playerName, characterId));
-
-                receiverThread = new Thread(this::receiveMessages);
-                receiverThread.start();
 
             } catch (IOException e) {
                 System.err.println("❌ Failed to connect: " + e.getMessage());
@@ -140,6 +133,7 @@ public class Client extends JFrame {
         }).start();
     }
 
+
     private void receiveMessages() {
         try {
             String line;
@@ -149,34 +143,17 @@ public class Client extends JFrame {
                 }
             }
         } catch (IOException e) {
-            System.err.println("📴 Disconnected from server: " + e.getMessage());
-        } finally {
-            try {
-                if (socket != null) socket.close();
-            } catch (IOException ignored) {}
+            System.err.println("📴 Lost connection: " + e.getMessage());
         }
     }
 
     public void sendMessage(String msg) {
-        if (out != null && connected) {
-            out.println(msg);
-        }
+        if (out != null && connected) out.println(msg);
     }
 
-    // ============================================================
-    // ✅ getter / setter ต่าง ๆ
-    // ============================================================
-    public void setServerIp(String ip) {
-        this.serverIp = ip;
-    }
-
-    public String getServerIp() {
-        return serverIp;
-    }
-
-    public boolean isConnected() {
-        return connected;
-    }
+    public void setServerIp(String ip) { this.serverIp = ip; }
+    public String getServerIp() { return serverIp; }
+    public String getPlayerName() { return playerName; }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(Client::new);

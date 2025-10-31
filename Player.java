@@ -60,12 +60,11 @@ public class Player {
 
             for (int i = 0; i < frameCount; i++) {
                 String path = basePath + folder + "/" + folder + "_" + i + ".png";
+
                 try {
                     var stream = getClass().getResourceAsStream(path);
                     if (stream != null) {
                         frames[i] = ImageIO.read(stream);
-                    } else {
-                        System.err.println("❌ Missing sprite: " + path);
                     }
                 } catch (Exception e) {
                     System.err.println("❌ Error loading sprite: " + path);
@@ -115,11 +114,9 @@ public class Player {
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
         BufferedImage[] currentAnimation = animations.get(getCurrentAnimationKey());
+
         if (currentAnimation != null && currentFrame < currentAnimation.length && currentAnimation[currentFrame] != null) {
             g2d.drawImage(currentAnimation[currentFrame], x, y, drawWidth, drawHeight, null);
-        } else {
-            g.setColor(isLocalPlayer ? Color.GREEN : Color.RED);
-            g.fillRect(x, y, 64, 64);
         }
 
         g2d.dispose();
@@ -152,7 +149,6 @@ public class Player {
         }
     }
 
-    // ===== MODIFIED ===== แก้ไขให้รับค่า State และ Direction จาก Server
     public void syncFromServer(int x, int y, int hp, boolean hasSword, boolean isAlive, boolean isReady, String stateStr, String facingStr) {
         this.hp = hp;
         this.hasSword = hasSword;
@@ -220,7 +216,6 @@ public class Player {
         g.drawString(name, x + (drawWidth - w)/2, y - 15);
     }
 
-    // ===== NEW ===== เมธอดใหม่สำหรับดึงข้อมูลไปส่งให้ Server
     public String getFacingDirection() {
         return this.facing.toString();
     }

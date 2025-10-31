@@ -14,29 +14,24 @@ public class MainMenuPanel extends JPanel {
         try {
             background = new ImageIcon(getClass().getResource("/assets/pixel-art.png")).getImage();
         } catch (Exception e) {
-            System.err.println("MainMenu background not found.");
             setBackground(Color.GRAY);
         }
 
         JButton join = styled("JOIN");
-        join.setBounds(325, 220, 150, 40);
-        JButton set  = styled("Setting");
-        set.setBounds(325, 270, 150, 40);
-        JButton cred = styled("Credit");
-        cred.setBounds(325, 320, 150, 40);
-
+        join.setBounds(325, 250, 150, 50);
         join.addActionListener(e -> onJoin());
-
-        set.addActionListener(e -> JOptionPane.showMessageDialog(this,
-                "Settings\n\nSound: ON\nMusic: ON\nDifficulty: Normal",
-                "Settings", JOptionPane.INFORMATION_MESSAGE));
-
-        cred.addActionListener(e -> JOptionPane.showMessageDialog(this,
-                "PvP Fighting Game\n\nDeveloped by: You!\nVersion: 1.0\n\n© 2025",
-                "Credits", JOptionPane.INFORMATION_MESSAGE));
-
         add(join);
+
+        JButton set = styled("SETTING");
+        set.setBounds(325, 320, 150, 50);
+        set.addActionListener(e -> JOptionPane.showMessageDialog(this,
+                "Sound: ON\nMusic: ON\nDifficulty: Normal", "Settings", JOptionPane.INFORMATION_MESSAGE));
         add(set);
+
+        JButton cred = styled("CREDIT");
+        cred.setBounds(325, 390, 150, 50);
+        cred.addActionListener(e -> JOptionPane.showMessageDialog(this,
+                "PvP Fighting Game\nDeveloped by: You!\n© 2025", "Credits", JOptionPane.INFORMATION_MESSAGE));
         add(cred);
     }
 
@@ -55,23 +50,18 @@ public class MainMenuPanel extends JPanel {
     }
 
     private void onJoin() {
-        // ตัด dialog กรอกชื่อออก เหลือแค่กรอก IP
         String serverIp = JOptionPane.showInputDialog(this,
                 "Enter Server IP (default: localhost):", "localhost");
-        if (serverIp == null || serverIp.isEmpty()) {
-            serverIp = "localhost";
-        }
+        if (serverIp == null || serverIp.isEmpty()) serverIp = "localhost";
 
         client.setServerIp(serverIp);
-        // ใช้ชื่อดีฟอลต์ (หรือจะดึงมาจาก client ก็ได้)
-        String defaultName = "Player";
+        String defaultName = client.getPlayerName() != null ? client.getPlayerName() : "Player";
         client.showCharacterSelection(defaultName);
     }
 
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (background != null) {
+        if (background != null)
             g.drawImage(background, 0, 0, getWidth(), getHeight(), this);
-        }
     }
 }

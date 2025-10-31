@@ -41,6 +41,14 @@ public class Sword {
         double d = Math.hypot(cx - pcx, cy - pcy);
         return d <= PICKUP_RANGE;
     }
+    public void setPosition(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public void setPickedUp(boolean pickedUp) {
+        this.pickedUp = pickedUp;
+    }
 
     public void pickup() { pickedUp = true; }
     public void reset()  { pickedUp = false; }

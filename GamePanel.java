@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class GamePanel extends JPanel implements KeyListener {
@@ -11,7 +12,7 @@ public class GamePanel extends JPanel implements KeyListener {
     private JButton backButton;
     private Client client;
     private Player localPlayer;
-    private final Map<String, Player> allPlayers = new LinkedHashMap<>();
+    private final Map<String, Player> allPlayers = new ConcurrentHashMap<>();
     private final List<Sword> swords = new CopyOnWriteArrayList<>();
     private Timer gameTimer;
     private Timer networkTimer;
@@ -101,7 +102,6 @@ public class GamePanel extends JPanel implements KeyListener {
             networkTimer.stop();
             client.backToMainMenu();
         });
-        add(backButton);
     }
 
     public void setLocalPlayer(String name, String spritePath) {
@@ -192,15 +192,32 @@ public class GamePanel extends JPanel implements KeyListener {
                 allPlayers.keySet().retainAll(activePlayerNames);
                 repaint();
 
-                swords.clear();
                 if (stateParts.length > 1 && stateParts[1].startsWith("SWORDS")) {
                     String[] swordTokens = stateParts[1].split(":");
-                    for (int i = 1; i < swordTokens.length; i++) {
+                    int swordCount = swordTokens.length - 1;
+
+                    // ถ้ายังไม่มีให้สร้างครั้งเดียว
+                    while (swords.size() < swordCount) {
+                        swords.add(new Sword(0, 0)); // placeholder
+                    }
+
+                    // อัปเดตค่าจาก server
+                    for (int i = 1; i <= swordCount; i++) {
                         String[] sData = swordTokens[i].split(",");
                         if (sData.length < 3) continue;
-                        Sword s = new Sword(Integer.parseInt(sData[0]), Integer.parseInt(sData[1]));
-                        if (Boolean.parseBoolean(sData[2])) s.pickup();
-                        swords.add(s);
+
+                        int x = Integer.parseInt(sData[0]);
+                        int y = Integer.parseInt(sData[1]);
+                        boolean pickedUp = Boolean.parseBoolean(sData[2]);
+
+                        Sword sword = swords.get(i - 1);
+                        sword.setPosition(x, y);
+                        sword.setPickedUp(pickedUp);
+                    }
+
+                    // ถ้ามีเกิน (server ลดจำนวนดาบ)
+                    while (swords.size() > swordCount) {
+                        swords.remove(swords.size() - 1);
                     }
                 }
 
