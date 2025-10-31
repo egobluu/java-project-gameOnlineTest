@@ -1,7 +1,8 @@
 import javax.swing.*;
 import java.awt.*;
 
-public class CharacterSelectionPanel extends JPanel {
+public class
+CharacterSelectionPanel extends JPanel {
     private final Client client;
     private final String playerName;
 
