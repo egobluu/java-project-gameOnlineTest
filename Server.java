@@ -28,7 +28,7 @@ public class Server {
     private static final Map<String, PlayerState> players = new ConcurrentHashMap<>();
     private static final List<SwordState> swords = new CopyOnWriteArrayList<>();
     private static final Set<PrintWriter> clientWriters = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private static final int REQUIRED_PLAYERS = 3;
+    private static final int REQUIRED_PLAYERS = 1;
     private static volatile boolean gameStarted = false;
     private static final List<Point> graves = new CopyOnWriteArrayList<>();
 

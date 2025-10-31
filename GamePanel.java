@@ -38,7 +38,16 @@ public class GamePanel extends JPanel implements KeyListener {
 
         setFocusable(true);
         requestFocusInWindow();
+
         addKeyListener(this);
+
+        // ✅ auto focus ถ้าถูกแสดงบนจอ
+        addHierarchyListener(e -> {
+            if (isShowing()) {
+                requestFocusInWindow();
+                System.out.println("🎯 Focus requested on GamePanel");
+            }
+        });
 
         try {
             var graveUrl = getClass().getResource("/assets/player/Grave.png");
@@ -55,24 +64,20 @@ public class GamePanel extends JPanel implements KeyListener {
         readyButton.setFocusable(false);
         readyButton.addActionListener(e -> {
             if (client != null) client.sendMessage("READY");
+            requestFocusInWindow(); // ✅ หลังจากกด ปุ่ม focus กลับมาที่เกม
         });
         add(readyButton);
 
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                requestFocusInWindow(); // ✅ คลิกจอ focus กลับมาที่ panel
                 if (gameStarted && !gameOver && !isSpectator && localPlayer != null && localPlayer.hasSword()) {
                     if (client != null) client.sendMessage("ATTACK");
                     localPlayer.attack();
                 }
             }
         });
-        addHierarchyListener(e -> {
-            if (isShowing()) {
-                requestFocusInWindow();
-            }
-        });
-
 
         gameTimer = new Timer(1000 / 60, e -> {
             updateLocalPlayerMovement();
@@ -84,6 +89,7 @@ public class GamePanel extends JPanel implements KeyListener {
         networkTimer = new Timer(50, e -> sendMovementToServer());
         networkTimer.start();
     }
+
 
     public void setClient(Client c) {
         this.client = c;
@@ -284,6 +290,7 @@ public class GamePanel extends JPanel implements KeyListener {
     }
 
     @Override public void keyPressed(KeyEvent e) {
+        System.out.println("🔹 Key pressed: " + e.getKeyChar());
         if (localPlayer == null || !gameStarted || gameOver || isSpectator) return;
         switch (e.getKeyCode()) {
             case KeyEvent.VK_A, KeyEvent.VK_LEFT -> localPlayer.setMovingLeft(true);
