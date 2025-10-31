@@ -67,6 +67,12 @@ public class GamePanel extends JPanel implements KeyListener {
                 }
             }
         });
+        addHierarchyListener(e -> {
+            if (isShowing()) {
+                requestFocusInWindow();
+            }
+        });
+
 
         gameTimer = new Timer(1000 / 60, e -> {
             updateLocalPlayerMovement();
@@ -94,10 +100,20 @@ public class GamePanel extends JPanel implements KeyListener {
     public void setLocalPlayer(String name, String spritePath) {
         this.localPlayer = new Player(name, spritePath, true);
         allPlayers.put(name, this.localPlayer);
-        requestFocusInWindow();
+        SwingUtilities.invokeLater(this::requestFocusInWindow);
     }
 
     private void updateLocalPlayerMovement() {
+        if (localPlayer == null) {
+            System.out.println("⚠ localPlayer == null (ไม่พบผู้เล่นควบคุม)");
+            return;
+        }
+
+        if (!gameStarted) {
+            System.out.println("⚠ เกมยังไม่เริ่ม (gameStarted=false)");
+            return;
+        }
+
         if (localPlayer != null && gameStarted && !gameOver && !isSpectator) {
             localPlayer.updateMovement(getWidth(), getHeight());
             localPlayer.clampToGround(groundTopY, groundBottomY, getWidth());
