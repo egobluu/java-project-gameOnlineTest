@@ -28,7 +28,7 @@ public class Server {
     private static final Map<String, PlayerState> players = new ConcurrentHashMap<>();
     private static final List<SwordState> swords = new CopyOnWriteArrayList<>();
     private static final Set<PrintWriter> clientWriters = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private static final int REQUIRED_PLAYERS = 1;
+    private static final int REQUIRED_PLAYERS = 3;
     private static volatile boolean gameStarted = false;
     private static final List<Point> graves = new CopyOnWriteArrayList<>();
 
@@ -119,6 +119,24 @@ public class Server {
                 try { socket.close(); } catch (IOException ignored) {}
             }
         }
+    }
+    private static synchronized void resetGame() {
+        System.out.println("🔁 Resetting game state for next round...");
+        gameStarted = false;
+        PlayerState.deathOrder.clear();
+        graves.clear();
+        swords.clear();
+
+        for (PlayerState p : players.values()) {
+            p.hp = 100;
+            p.isAlive = true;
+            p.hasSword = false;
+            p.isReady = false;
+            p.actionState = "IDLE";
+            p.facingDirection = "RIGHT";
+        }
+
+        broadcast("RESET_GAME");
     }
 
     private static synchronized boolean isCharacterTaken(String charId) {
@@ -326,8 +344,7 @@ public class Server {
             System.out.println("Ranking: " + rankingList);
 
             // reset สำหรับรอบต่อไป
-            gameStarted = false;
-            PlayerState.deathOrder.clear();
+            resetGame();
         }
     }
 
